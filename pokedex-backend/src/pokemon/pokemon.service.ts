@@ -20,6 +20,7 @@ export class PokemonService {
   private readonly baseUrl = 'https://pokeapi.co/api/v2';
 
   async findAll(query: ListQueryDto): Promise<PokemonListResponse> {
+    console.log("se llama a este método")
     const url: string = `${this.baseUrl}/pokemon?limit=${query.limit}&offset=${query.offset}`;
 
     // Verificar si la información solicitada está en caché
