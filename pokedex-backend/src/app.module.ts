@@ -6,7 +6,7 @@ import { PokemonModule } from './pokemon/pokemon.module';
 import configuration from 'config/configuration';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
-import { CustomThrottlerGuard } from './MyThrottlerGuard.guard';
+import { CacheModule } from '@nestjs/cache-manager';
 
 @Module({
   imports: [
@@ -18,9 +18,10 @@ import { CustomThrottlerGuard } from './MyThrottlerGuard.guard';
       {
         name: 'default',
         ttl: 60000, // 60 segundos,
-        limit: 5,
+        limit: 5, // Limite de 5 peticiones por periodo de tiempo, en este caso 60 segundos
       },
     ]),
+    CacheModule.register(),
     PokemonModule,
   ],
   controllers: [AppController],
@@ -28,7 +29,7 @@ import { CustomThrottlerGuard } from './MyThrottlerGuard.guard';
     AppService,
     {
       provide: APP_GUARD,
-      useClass: CustomThrottlerGuard,
+      useClass: ThrottlerGuard,
     },
   ],
 })
