@@ -25,7 +25,7 @@ export class PokemonService {
     const url = `${this.baseUrl}${path}`;
     const cached = await this.cacheManager.get<T>(url);
     if (cached) return cached;
-    
+
     try {
       const response = await firstValueFrom(this.httpService.get<T>(url));
       await this.cacheManager.set(url, response.data, ttl);
@@ -46,9 +46,9 @@ export class PokemonService {
     
     return {
       total: data.count,
-      results: data.results.map((p) => ({
-        id: this.extractIdFromUrl(p.url),
-        name: p.name,
+      results: data.results.map((pokemon) => ({
+        id: this.extractIdFromUrl(pokemon.url),
+        name: pokemon.name,
       })),
     };
     
@@ -56,7 +56,7 @@ export class PokemonService {
 
   // Obtener los detalles técnicos de un pokémon
   async getDetail(id: string | number): Promise<PokemonDetail> {
-    const data = await this.getFromApi<any>(`/pokemon/${id}`, 1800);
+    const data = await this.getFromApi<any>(`/pokemon/${id}`, 1.8e+6);
 
     return {
       id: data.id,
@@ -78,7 +78,7 @@ export class PokemonService {
 
   // Obtener detalles biológicos y de contexto de un pokémon
   async getSpecies(id: string | number): Promise<PokemonSpecies> {
-    const data = await this.getFromApi<any>(`/pokemon-species/${id}`, 3600);
+    const data = await this.getFromApi<any>(`/pokemon-species/${id}`, 1.8e+6);
     const flavor = data.flavor_text_entries.find(
       (entry) => entry.language.name === 'es' || entry.language.name === 'en',
     );
@@ -107,7 +107,7 @@ export class PokemonService {
 
     const chainData = await this.getFromApi<any>(
       species.evolutionChainUrl.replace(this.baseUrl, ''),
-      3600,
+      1.8e+6,
     );
 
     const mapChain = (node: any): EvolutionNode => ({
@@ -123,7 +123,7 @@ export class PokemonService {
 
   // Obtener el listado de los tipos de pokémon que existen
   async listTypes(): Promise<PokemonTypesResponse> {
-    const data = await this.getFromApi<any>('/type', 7200);
+    const data = await this.getFromApi<any>('/type', 1.8e+6);
     const types = data.results
       .map((result) => result.name)
       .filter((typeName) => typeName !== 'unknown' && typeName !== 'shadow')
