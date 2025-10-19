@@ -7,4 +7,6 @@ export interface PokemonDetail {
   abilities: { name: string; hidden: boolean }[];
   stats: { name: string; base: number }[];
   sprite: string;
+  flavorText?: string;
+  evolution?: string[];
 }

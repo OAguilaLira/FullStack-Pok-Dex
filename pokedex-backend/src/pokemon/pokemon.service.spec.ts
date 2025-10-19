@@ -88,7 +88,7 @@ describe('PokemonService', () => {
   // TEST 2: getDetail() Obtención de los detalles técnicos de un pokemón
   // =========================================================
   describe('getDetail()', () => {
-    it('should map Pokémon detail correctly', async () => {
+    it('should map Pokémon detail correctly with species and evolution', async () => {
       const mockApiResponse = {
         id: 25,
         name: 'pikachu',
@@ -103,8 +103,24 @@ describe('PokemonService', () => {
         sprites: { front_default: 'https://sprite.png' },
       };
 
-      cacheManagerMock.get.mockResolvedValueOnce(null);
-      httpServiceMock.get.mockReturnValueOnce(of({ data: mockApiResponse }));
+      // Mocking getFromApi() since it's used inside getDetail()
+      jest
+        .spyOn(service as any, 'getFromApi')
+        .mockResolvedValueOnce(mockApiResponse); // For /pokemon/25
+
+      // Mock species + evolution chain methods
+      jest.spyOn(service, 'getSpecies').mockResolvedValueOnce({
+        id: 25,
+        name: 'pikachu',
+        color: 'yellow',
+        habitat: 'forest',
+        flavorText: 'Este Pokémon almacena electricidad.',
+        evolutionChainUrl: 'https://pokeapi.co/api/v2/evolution-chain/10/',
+      } as any);
+
+      jest
+        .spyOn(service as any, 'getEvolutionFromSpecies')
+        .mockResolvedValueOnce(['pichu', 'pikachu', 'raichu']);
 
       const result = await service.getDetail(25);
 
@@ -120,14 +136,19 @@ describe('PokemonService', () => {
         ],
         stats: [{ name: 'speed', base: 90 }],
         sprite: 'https://sprite.png',
+        flavorText: 'Este Pokémon almacena electricidad.',
+        evolution: ['pichu', 'pikachu', 'raichu'],
       });
+
+      expect(cacheManagerMock.set).toHaveBeenCalled();
     });
 
-    it('should throw if API fails', async () => {
-      cacheManagerMock.get.mockResolvedValueOnce(null);
-      httpServiceMock.get.mockReturnValueOnce(
-        throwError(() => new Error('Network error')),
-      );
+    it('should throw an HttpException if API fails', async () => {
+      jest
+        .spyOn(service as any, 'getFromApi')
+        .mockRejectedValueOnce(
+          new HttpException('Failed', HttpStatus.BAD_GATEWAY),
+        );
 
       await expect(service.getDetail(25)).rejects.toThrow(HttpException);
     });
@@ -154,8 +175,9 @@ describe('PokemonService', () => {
         },
       };
 
-      cacheManagerMock.get.mockResolvedValueOnce(null);
-      httpServiceMock.get.mockReturnValueOnce(of({ data: mockApiResponse }));
+      jest
+        .spyOn(service as any, 'getFromApi')
+        .mockResolvedValueOnce(mockApiResponse);
 
       const result = await service.getSpecies(25);
 
@@ -180,7 +202,7 @@ describe('PokemonService', () => {
         name: 'pikachu',
         evolutionChainUrl: 'https://pokeapi.co/api/v2/evolution-chain/10/',
       };
-      
+
       const chainMock = {
         id: 10,
         chain: {
@@ -197,7 +219,7 @@ describe('PokemonService', () => {
       jest
         .spyOn(service, 'getSpecies')
         .mockResolvedValueOnce(speciesMock as any);
-      httpServiceMock.get.mockReturnValueOnce(of({ data: chainMock }));
+      jest.spyOn(service as any, 'getFromApi').mockResolvedValueOnce(chainMock);
 
       const result = await service.getEvolution(25);
 
@@ -239,8 +261,9 @@ describe('PokemonService', () => {
         ],
       };
 
-      cacheManagerMock.get.mockResolvedValueOnce(null);
-      httpServiceMock.get.mockReturnValueOnce(of({ data: mockApiResponse }));
+      jest
+        .spyOn(service as any, 'getFromApi')
+        .mockResolvedValueOnce(mockApiResponse);
 
       const result = await service.listTypes();
 
@@ -248,6 +271,113 @@ describe('PokemonService', () => {
         total: 2,
         types: ['fuego', 'agua'],
       });
+    });
+  });
+
+  // =========================================================
+  // TEST 6: getByType() - Pokémon filtered by type
+  // =========================================================
+  describe('getByType()', () => {
+    it('should return mapped Pokémon list by type', async () => {
+      const mockApiResponse = {
+        name: 'electric',
+        pokemon: [
+          {
+            pokemon: {
+              name: 'pikachu',
+              url: 'https://pokeapi.co/api/v2/pokemon/25/',
+            },
+          },
+          {
+            pokemon: {
+              name: 'magnemite',
+              url: 'https://pokeapi.co/api/v2/pokemon/81/',
+            },
+          },
+        ],
+      };
+
+      cacheManagerMock.get.mockResolvedValueOnce(null); // No cache
+      httpServiceMock.get.mockReturnValueOnce(of({ data: mockApiResponse }));
+
+      const result = await service.getByType('electric');
+
+      expect(result).toEqual({
+        name: 'electric',
+        pokemons: [
+          { id: '25', name: 'pikachu' },
+          { id: '81', name: 'magnemite' },
+        ],
+      });
+
+      expect(cacheManagerMock.set).toHaveBeenCalled();
+    });
+
+    it('should use cached data if available', async () => {
+      const cached = {
+        name: 'electric',
+        pokemons: [{ id: '25', name: 'pikachu' }],
+      };
+
+      cacheManagerMock.get.mockResolvedValueOnce(cached);
+
+      const result = await service.getByType('electric');
+
+      expect(result).toEqual(cached);
+      expect(httpServiceMock.get).not.toHaveBeenCalled();
+    });
+  });
+
+  // =========================================================
+  // TEST 7: getEvolutionFromSpecies() - Extracting evolution names
+  // =========================================================
+  describe('getEvolutionFromSpecies()', () => {
+    const speciesMock = {
+      id: 25,
+      evolutionChainUrl: 'https://pokeapi.co/api/v2/evolution-chain/10/',
+    };
+
+    it('should return mapped evolution names', async () => {
+      const chainMock = {
+        chain: {
+          species: { name: 'pichu' },
+          evolves_to: [
+            {
+              species: { name: 'pikachu' },
+              evolves_to: [{ species: { name: 'raichu' }, evolves_to: [] }],
+            },
+          ],
+        },
+      };
+
+      cacheManagerMock.get.mockResolvedValueOnce(null); // no cache
+      httpServiceMock.get.mockReturnValueOnce(of({ data: chainMock }));
+
+      const result = await (service as any).getEvolutionFromSpecies(
+        speciesMock,
+      );
+
+      expect(result).toEqual(['pichu', 'pikachu', 'raichu']);
+      expect(cacheManagerMock.set).toHaveBeenCalled();
+    });
+
+    it('should return cached evolution chain if available', async () => {
+      const cached = ['pichu', 'pikachu', 'raichu'];
+      cacheManagerMock.get.mockResolvedValueOnce(cached);
+
+      const result = await (service as any).getEvolutionFromSpecies(
+        speciesMock,
+      );
+      expect(result).toEqual(cached);
+      expect(httpServiceMock.get).not.toHaveBeenCalled();
+    });
+
+    it('should return empty array if species has no evolutionChainUrl', async () => {
+      const noChainSpecies = { id: 99, evolutionChainUrl: null };
+      const result = await (service as any).getEvolutionFromSpecies(
+        noChainSpecies,
+      );
+      expect(result).toEqual([]);
     });
   });
 });

@@ -7,9 +7,12 @@ import { PokemonListResponse } from './interfaces/pokemon-list-response.interfac
 import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
 import { PokemonDetail } from './interfaces/pokemon-detail.interface';
 import { PokemonSpecies } from './interfaces/pokemon-species.interface';
-import { EvolutionNode, PokemonEvolution } from './interfaces/pokekmon-evolution.interface';
+import {
+  EvolutionNode,
+  PokemonEvolution,
+} from './interfaces/pokekmon-evolution.interface';
 import { PokemonTypesResponse } from './interfaces/pokemon-types.interface';
-
+import { PokemonTypeResponse } from './interfaces/PokemonTypeResponse.interface';
 
 @Injectable()
 export class PokemonService {
@@ -40,10 +43,13 @@ export class PokemonService {
 
   // Listado básico de los pokémon
   async findAll(query: ListQueryDto): Promise<PokemonListResponse> {
-    const pokemonListTTL = 600000 // Equivalente a 10 minutos
+    const pokemonListTTL = 600000; // Equivalente a 10 minutos
     const url: string = `/pokemon?limit=${query.limit}&offset=${query.offset}`;
-    const data = await this.getFromApi<PokeApiListResponse>(url, pokemonListTTL);
-    
+    const data = await this.getFromApi<PokeApiListResponse>(
+      url,
+      pokemonListTTL,
+    );
+
     return {
       total: data.count,
       results: data.results.map((pokemon) => ({
@@ -51,19 +57,20 @@ export class PokemonService {
         name: pokemon.name,
       })),
     };
-    
   }
 
   // Obtener los detalles técnicos de un pokémon
   async getDetail(id: string | number): Promise<PokemonDetail> {
-    const data = await this.getFromApi<any>(`/pokemon/${id}`, 1.8e+6);
+    const data = await this.getFromApi<any>(`/pokemon/${id}`, 1.8e6);
 
-    return {
+    const result: PokemonDetail = {
       id: data.id,
       name: data.name,
       height: data.height,
       weight: data.weight,
-      types: data.types.map((typeObject) => this.translateType(typeObject.type.name)),
+      types: data.types.map((typeObject) =>
+        this.translateType(typeObject.type.name),
+      ),
       abilities: data.abilities.map((abilityObject) => ({
         name: abilityObject.ability.name,
         hidden: abilityObject.is_hidden,
@@ -74,11 +81,25 @@ export class PokemonService {
       })),
       sprite: data.sprites.front_default,
     };
+
+    // Información adicional
+    const species = await this.getSpecies(data.id);
+    const evolution = await this.getEvolutionFromSpecies(species);
+
+    result.flavorText = species.flavorText;
+    result.evolution = evolution;
+
+    await this.cacheManager.set(
+      `${this.baseUrl}/pokemon/${id}`,
+      result,
+      600000,
+    );
+    return result;
   }
 
   // Obtener detalles biológicos y de contexto de un pokémon
   async getSpecies(id: string | number): Promise<PokemonSpecies> {
-    const data = await this.getFromApi<any>(`/pokemon-species/${id}`, 1.8e+6);
+    const data = await this.getFromApi<any>(`/pokemon-species/${id}`, 1.8e6);
     const flavor = data.flavor_text_entries.find(
       (entry) => entry.language.name === 'es' || entry.language.name === 'en',
     );
@@ -107,7 +128,7 @@ export class PokemonService {
 
     const chainData = await this.getFromApi<any>(
       species.evolutionChainUrl.replace(this.baseUrl, ''),
-      1.8e+6,
+      1.8e6,
     );
 
     const mapChain = (node: any): EvolutionNode => ({
@@ -123,7 +144,7 @@ export class PokemonService {
 
   // Obtener el listado de los tipos de pokémon que existen
   async listTypes(): Promise<PokemonTypesResponse> {
-    const data = await this.getFromApi<any>('/type', 1.8e+6);
+    const data = await this.getFromApi<any>('/type', 1.8e6);
     const types = data.results
       .map((result) => result.name)
       .filter((typeName) => typeName !== 'unknown' && typeName !== 'shadow')
@@ -132,6 +153,54 @@ export class PokemonService {
     return { total: types.length, types };
   }
 
+  async getByType(type: string): Promise<PokemonTypeResponse> {
+    const cacheKey = `pokemon:type:${type}`;
+    const cached = await this.cacheManager.get<PokemonTypeResponse>(cacheKey);
+    if (cached) return cached;
+
+    const { data } = await firstValueFrom(
+      this.httpService.get(`${this.baseUrl}/type/${type}`),
+    );
+
+    const mapped: PokemonTypeResponse = {
+      name: data.name,
+      pokemons: data.pokemon.map((p) => ({
+        id: this.extractIdFromUrl(p.pokemon.url),
+        name: p.pokemon.name,
+      })),
+    };
+
+    await this.cacheManager.set(cacheKey, mapped, 600000);
+    return mapped;
+  }
+
+  private async getEvolutionFromSpecies( species: PokemonSpecies): Promise<string[]> {
+    if (!species.evolutionChainUrl) return [];
+
+    const cacheKey = `pokemon:evolution:${species.id}`;
+    const cached = await this.cacheManager.get<string[]>(cacheKey);
+    if (cached) return cached;
+
+    const { data } = await firstValueFrom(
+      this.httpService.get(species.evolutionChainUrl),
+    );
+
+    const chain: string[] = [];
+    this.extractEvolutionChain(data.chain, chain);
+
+    await this.cacheManager.set(cacheKey, chain, 600000);
+    return chain;
+  }
+
+  private extractEvolutionChain(node: any, chain: string[]) {
+    if (!node) return;
+    chain.push(node.species.name);
+    if (node.evolves_to?.length > 0) {
+      node.evolves_to.forEach((next) =>
+        this.extractEvolutionChain(next, chain),
+      );
+    }
+  }
 
   private extractIdFromUrl(url: string) {
     // Extraer el ID del pokemon de la URL proporcionada por la PokeApi

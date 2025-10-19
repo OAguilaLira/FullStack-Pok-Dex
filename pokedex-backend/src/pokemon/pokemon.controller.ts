@@ -6,6 +6,7 @@ import { PokemonDetail } from './interfaces/pokemon-detail.interface';
 import { PokemonEvolution } from './interfaces/pokekmon-evolution.interface';
 import { PokemonSpecies } from './interfaces/pokemon-species.interface';
 import { PokemonTypesResponse } from './interfaces/pokemon-types.interface';
+import { PokemonTypeResponse } from './interfaces/PokemonTypeResponse.interface';
 
 @Controller('pokemon')
 export class PokemonController {
@@ -34,5 +35,10 @@ export class PokemonController {
   @Get('types')
   async types(): Promise<PokemonTypesResponse> {
     return this.pokemonService.listTypes();
+  }
+
+  @Get('type/:id')
+  async getBytype(@Param('id') id: string): Promise<PokemonTypeResponse> {
+    return this.pokemonService.getByType(id);
   }
 }
