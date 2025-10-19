@@ -8,5 +8,6 @@ import { CacheModule } from '@nestjs/cache-manager';
   imports: [HttpModule, CacheModule.register()],
   controllers: [PokemonController],
   providers: [PokemonService],
+  exports: [PokemonService]
 })
 export class PokemonModule {}

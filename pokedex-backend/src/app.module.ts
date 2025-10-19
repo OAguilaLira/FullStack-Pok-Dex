@@ -1,12 +1,15 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PokemonModule } from './pokemon/pokemon.module';
-import configuration from 'config/configuration';
+import {configuration} from 'config/configuration';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { CacheModule } from '@nestjs/cache-manager';
+import { AuthModule } from './auth/auth.module';
+import { UserModule } from './user/user.module';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 @Module({
   imports: [
@@ -22,7 +25,19 @@ import { CacheModule } from '@nestjs/cache-manager';
       },
     ]),
     CacheModule.register(),
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const dbConfig = configService.get('DB_CONFIG')
+        if (!dbConfig) {
+        throw new Error('Database configuration is missing in ConfigService');
+        }
+        return dbConfig;
+      }
+    }),
     PokemonModule,
+    AuthModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [
