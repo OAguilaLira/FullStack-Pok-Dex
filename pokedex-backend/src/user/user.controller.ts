@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpException, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
 import { UserService } from './user.service';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { PokemonService } from 'src/pokemon/pokemon.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PokemonService } from '../pokemon/pokemon.service';
 import { FavoriteDto } from './dto/favorite.dto';
 
 @Controller('user')
