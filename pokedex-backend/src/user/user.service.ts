@@ -30,7 +30,7 @@ export class UserService {
   }
 
   async findById(id: string): Promise<User | null> {
-    return this.repo.findOne({ where: { id } });
+    return this.repo.findOneBy({ id });
   }
 
   async addFavorite(userId: string, pokemonId: string): Promise<User> {
@@ -41,8 +41,10 @@ export class UserService {
       user.favorites = [];
     }
 
-    const validPokemon: Pokemon | null = this.pokemonService.getSpecies(pokemonId);
-    if (!validPokemon) throw new NotFoundException(`El pokemon con id ${pokemonId} no es válido`)
+    const validPokemon: Pokemon | null = await this.pokemonService.getSpecies(pokemonId);
+    if (!validPokemon) { 
+      throw new NotFoundException(`El pokemon con id ${pokemonId} no es válido`)
+    }
 
 
     if (user.favorites.includes(pokemonId)) {
