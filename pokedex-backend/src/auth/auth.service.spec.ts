@@ -8,10 +8,11 @@ import { create } from 'axios';
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn(),
+  compare: jest.fn()
 }));
 
 import * as bcrypt from 'bcrypt';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, UnauthorizedException } from '@nestjs/common';
 
 describe('AuthService', () => {
   let authService: AuthService;
@@ -104,7 +105,24 @@ describe('AuthService', () => {
     });
 
     // =========================================================
-    // TEST 3: Validación de tipo de retorno
+    // TEST 3: Contraseña incorrecta - UnauthorizedException
+    // =========================================================
+
+    it('should throw UnauthorizedException when password is inconrrect', async () => {
+      const existingUser = {
+        id: 'existing-id',
+        email: mockSignupDto.email,
+        password: mockHashedPassword
+      } as User;
+
+      mockUserService.findByEmail.mockResolvedValue(existingUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(authService.login({email: existingUser.email, password: 'test-password'})).rejects.toThrow(UnauthorizedException)
+    })
+
+    // =========================================================
+    // TEST 4: Validación de tipo de retorno
     // =========================================================
     it('should return User object with correct structure', async () => {
       jest.spyOn(mockUserService, 'findByEmail').mockResolvedValue(null);

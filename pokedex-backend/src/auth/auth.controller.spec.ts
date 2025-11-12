@@ -9,6 +9,8 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { User } from '../user/entities/user.entity';
 
 describe('AuthController', () => {
+  jest.mock('./guards/jwt-auth.guard'); 
+  
   let controller: AuthController;
 
   const mockRepository = {
