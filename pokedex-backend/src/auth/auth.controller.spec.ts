@@ -53,6 +53,10 @@ describe('AuthController', () => {
     controller = module.get<AuthController>(AuthController);
   });
 
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
   // =========================================================
   // TEST 1: El controlador debe estar definido
   // =========================================================
