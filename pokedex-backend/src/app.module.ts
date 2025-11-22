@@ -3,19 +3,20 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PokemonModule } from './pokemon/pokemon.module';
-import {configuration} from 'config/configuration';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { CacheModule } from '@nestjs/cache-manager';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { configuration } from '../config/configuration';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],
+      envFilePath: process.env.NODE_ENV === 'test' ? '.env.test' : '.env' 
     }),
     ThrottlerModule.forRoot([
       {
