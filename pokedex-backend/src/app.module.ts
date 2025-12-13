@@ -17,8 +17,10 @@ import { getRelevantConfig } from './config/config.utils';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [configuration], // Esto sigue igual (tu archivo de configuración)
-      envFilePath: process.env.NODE_ENV === 'test' ? '.env.test' : '.env', // Aquí decides qué archivo de configuración cargar
+      load: [configuration], 
+      envFilePath: process.env.NODE_ENV
+                ? `.env.${process.env.NODE_ENV}`
+                : '.development.env',
       validate: (config) => {
         // Filtrar solo las variables relevantes usando la función que acabamos de crear
         const relevantConfig = getRelevantConfig(config);
