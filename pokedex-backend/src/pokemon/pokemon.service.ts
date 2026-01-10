@@ -13,6 +13,7 @@ import {
 } from './interfaces/pokekmon-evolution.interface';
 import { PokemonTypesResponse } from './interfaces/pokemon-types.interface';
 import { PokemonTypeResponse } from './interfaces/PokemonTypeResponse.interface';
+import { AxiosError, AxiosResponse } from 'axios';
 
 @Injectable()
 export class PokemonService {
@@ -33,12 +34,33 @@ export class PokemonService {
       const response = await firstValueFrom(this.httpService.get<T>(url));
       await this.cacheManager.set(url, response.data, ttl);
       return response.data;
-    } catch (error) {
+      } catch (error) {
+    // Error HTTP desde PokéAPI
+    if (error.isAxiosError && error.response) {
       throw new HttpException(
-        `Failed to fetch data from PokéAPI: ${path}`,
-        HttpStatus.BAD_GATEWAY,
+        {
+          message: 'Error from external Pokémon API',
+          statusCode: error.response.status,
+          path,
+        },
+        error.response.status,
       );
     }
+
+    // Timeout / red / DNS
+    if (error.isAxiosError) {
+      throw new HttpException(
+        'Pokémon API is not reachable',
+        HttpStatus.GATEWAY_TIMEOUT,
+      );
+    }
+
+    // Error inesperado
+    throw new HttpException(
+      'Unexpected error while fetching Pokémon data',
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
   }
 
   // Listado básico de los pokémon

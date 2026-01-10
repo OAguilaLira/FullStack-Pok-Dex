@@ -1,10 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { BadGatewayException, INestApplication, NotFoundException, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { DataSource } from 'typeorm';
 import { PokemonService } from 'src/pokemon/pokemon.service';
+import { AxiosHeaders, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import { AxiosError } from 'axios';
 
 let pokemonService: PokemonService;
 
@@ -15,6 +17,19 @@ const mockPokemonService = {
       { id: '1', name: 'bulbasaur' },
       { id: '2', name: 'ivysaur' },
     ],
+  }),
+  getDetail: jest.fn().mockResolvedValue({
+    id: 25,
+    name: 'pikachu',
+    height: 4,
+    weight: 60,
+    types: [{ type: { name: 'electric' } }],
+    abilities: [
+      { ability: { name: 'static' }, is_hidden: false },
+      { ability: { name: 'lightning-rod' }, is_hidden: true },
+    ],
+    stats: [{ base_stat: 90, stat: { name: 'speed' } }],
+    sprites: { front_default: 'https://sprite.png' },
   }),
 };
 
@@ -54,9 +69,9 @@ describe('AppController (e2e)', () => {
     await moduleFixture.close();
   });
 
-  // ==============================================================
-  // TEST 1: El método findAll() debe retornar una lista de pokémon
-  // ==============================================================
+  // =================================================================
+  // TEST 1: La ruta /pokemon (GET) debe retornar una lista de pokémon
+  // =================================================================
   it('/pokemon (GET) - should return a mapped list of pokemons', async () => {
     const limit = 2;
     const offset = 0;
@@ -68,11 +83,24 @@ describe('AppController (e2e)', () => {
     expect(response.body.results).toHaveLength(2);
 
     expect(pokemonService.findAll).toHaveBeenCalledWith({
-      limit: limit, 
-      offset: offset, 
+      limit: limit,
+      offset: offset,
     });
 
   })
+
+  // ========================================================================
+  // TEST 2: La ruta /pokemon/:id (GET) debe retornar los datos de un pokemon
+  // ========================================================================
+  it('/pokemon/:id (GET) - should return a pokemon details', async () => {
+    const pokemonId = "25";
+
+    const response = await request(app.getHttpServer())
+      .get(`/pokemon/${pokemonId}`)
+      .expect(200);
+
+    expect(pokemonService.getDetail).toHaveBeenCalledWith(pokemonId);
+  });
 
   it('/ (GET)', () => {
     return request(app.getHttpServer())
